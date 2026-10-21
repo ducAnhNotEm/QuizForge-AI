@@ -1,0 +1,17 @@
+# TÀI LIỆU MẪU KIỂM THỬ: CẤU TRÚC DỮ LIỆU VÀ GIẢI THUẬT
+
+Chương 1: Độ phức tạp của thuật toán
+Thuật toán là một tập hợp hữu hạn các chỉ thị có thứ tự nhằm giải quyết một bài toán xác định.
+Hiệu năng của thuật toán thường được đánh giá qua độ phức tạp thời gian (Time Complexity) và độ phức tạp không gian (Space Complexity).
+
+Ký hiệu Big-O (O) được dùng phổ biến để biểu diễn chặn trên của thời gian thực thi:
+- Độ phức tạp O(1): Thời gian thực thi là hằng số, không phụ thuộc vào kích thước đầu vào n. Ví dụ: Truy cập một phần tử trong mảng theo chỉ số.
+- Độ phức tạp O(log n): Thời gian thực thi tăng logarit so với kích thước n. Ví dụ điển hình là thuật toán tìm kiếm nhị phân (Binary Search) trên mảng đã sắp xếp.
+- Độ phức tạp O(n): Thời gian thực thi tỉ lệ thuận với kích thước n. Ví dụ: Tìm kiếm tuần tự (Linear Search).
+- Độ phức tạp O(n log n): Thường gặp trong các thuật toán sắp xếp hiệu quả như Merge Sort, Quick Sort (trường hợp trung bình).
+- Độ phức tạp O(n^2): Thời gian thực thi tỉ lệ với bình phương kích thước n. Ví dụ: Thuật toán sắp xếp nổi bọt (Bubble Sort) hoặc sắp xếp chọn (Selection Sort).
+
+Chương 2: Cấu trúc dữ liệu ngăn xếp (Stack)
+Ngăn xếp là một danh sách có thứ tự mà thao tác thêm (push) và xóa (pop) đều diễn ra tại một đầu gọi là đỉnh (top) của ngăn xếp.
+Ngăn xếp hoạt động theo nguyên lý LIFO (Last In First Out - Vào sau ra trước).
+Các ứng dụng tiêu biểu của ngăn xếp bao gồm: khử đệ quy, kiểm tra tính đúng đắn của dấu ngoặc và tính toán biểu thức hậu tố.
