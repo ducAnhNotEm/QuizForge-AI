@@ -1,0 +1,45 @@
+{
+  "questgen_sample": {
+    "stem": "Thuật toán tìm kiếm nhị phân yêu cầu cấu trúc dữ liệu mảng phải thoả mãn điều kiện tiên quyết nào?",
+    "options": [
+      "Mảng đã được sắp xếp thứ tự",
+      "Mảng có kích thước là lũy thừa của 2",
+      "Mảng không chứa phần tử trùng lặp",
+      "Mảng liên kết động qua con trỏ"
+    ],
+    "correct_answer": "Mảng đã được sắp xếp thứ tự",
+    "explanation": "Tìm kiếm nhị phân dựa trên nguyên lý so sánh phần tử ở giữa và chia đôi khoảng tìm kiếm, do đó mảng bắt buộc phải được sắp xếp trước.",
+    "source_ids": ["unit_chunk_101"]
+  },
+  "questgen_sources_table": {
+    "unit_chunk_101": {
+      "doc_id": "doc_ctdl_01",
+      "file_name": "Giao_trinh_CTDL_GT.pdf",
+      "page": 25,
+      "snippet": "Thuật toán tìm kiếm nhị phân (Binary Search) chỉ áp dụng được trên danh sách các phần tử đã được sắp xếp."
+    }
+  },
+  "expected_target_output": {
+    "id": "q_test_001",
+    "course_id": "course_cntt",
+    "type": "mcq",
+    "question": "Thuật toán tìm kiếm nhị phân yêu cầu cấu trúc dữ liệu mảng phải thoả mãn điều kiện tiên quyết nào?",
+    "options": [
+      {"id": "A", "text": "Mảng đã được sắp xếp thứ tự"},
+      {"id": "B", "text": "Mảng có kích thước là lũy thừa của 2"},
+      {"id": "C", "text": "Mảng không chứa phần tử trùng lặp"},
+      {"id": "D", "text": "Mảng liên kết động qua con trỏ"}
+    ],
+    "correct_option_id": "A",
+    "explanation": "Tìm kiếm nhị phân dựa trên nguyên lý so sánh phần tử ở giữa và chia đôi khoảng tìm kiếm, do đó mảng bắt buộc phải được sắp xếp trước.",
+    "source_refs": [
+      {
+        "doc_id": "doc_ctdl_01",
+        "file_name": "Giao_trinh_CTDL_GT.pdf",
+        "page": 25,
+        "snippet": "Thuật toán tìm kiếm nhị phân (Binary Search) chỉ áp dụng được trên danh sách các phần tử đã được sắp xếp."
+      }
+    ],
+    "status": "draft"
+  }
+}

@@ -58,11 +58,11 @@ Người dùng có thể:
 ### M1 — Thiết kế hợp đồng giữa các module
 **Phụ trách:** SV1 + SV2; SV3 ghi vào tài liệu.
 
-- [ ] M1.1 — Chốt luồng: chọn môn/tài liệu → upload/index → yêu cầu sinh câu hỏi → xem nguồn → review câu hỏi.
-- [ ] M1.2 — Chốt schema câu hỏi và response API trước khi code song song.
-- [ ] M1.3 — Chốt cách thể hiện lỗi: file không hỗ trợ, tài liệu rỗng, chưa cấu hình model, model timeout, đầu ra sai schema.
-- [ ] M1.4 — Thêm `docs/API_CONTRACT.md` mô tả endpoint thực tế sau khi đối chiếu `backend/app.py`; không tự đặt endpoint rồi coi là đã tồn tại.
-- [ ] M1.5 — Tạo fixture tài liệu nhỏ, không chứa thông tin nhạy cảm, dùng chung cho test.
+- [x] M1.1 — Chốt luồng: chọn môn/tài liệu → upload/index → yêu cầu sinh câu hỏi → xem nguồn → review câu hỏi.
+- [x] M1.2 — Chốt schema câu hỏi và response API trước khi code song song.
+- [x] M1.3 — Chốt cách thể hiện lỗi: file không hỗ trợ, tài liệu rỗng, chưa cấu hình model, model timeout, đầu ra sai schema.
+- [x] M1.4 — Thêm `docs/API_CONTRACT.md` mô tả endpoint thực tế sau khi đối chiếu `backend/app.py`; không tự đặt endpoint rồi coi là đã tồn tại.
+- [x] M1.5 — Tạo fixture tài liệu nhỏ, không chứa thông tin nhạy cảm, dùng chung cho test.
 
 **Schema đề xuất cho một câu hỏi:**
 ```json
@@ -258,7 +258,7 @@ Cập nhật bảng dưới đây trong quá trình làm; không đánh dấu ho
 | Milestone | Trạng thái | Bằng chứng / PR |
 |---|---|---|
 | M0 — Baseline | Not started | |
-| M1 — Contract | Not started | |
+| M1 — Contract | Completed | `docs/API_CONTRACT.md`, `backend/schemas.py`, 6/6 tests passed in `tests/test_contract.py` |
 | M2 — Retrieval | Not started | |
 | M3 — Generation | Not started | |
 | M4 — Integration | Not started | |
