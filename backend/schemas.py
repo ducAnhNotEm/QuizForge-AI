@@ -208,3 +208,39 @@ def questgen_to_target_schema(
         source_refs=source_refs,
         status=mapped_status
     )
+
+
+# ==============================================================================
+# Milestone M2 Inter-Module Hand-off Schemas (SV1 -> SV2 -> SV3)
+# ==============================================================================
+
+class ParsedPage(BaseModel):
+    page: Optional[int] = Field(default=None, description="Page number for PDF (1-based), None for DOCX/TXT")
+    text: str = Field(description="Extracted clean text content of the page or section")
+
+
+class ParsedDocument(BaseModel):
+    """Output of SV1 (Parsing & Validation) -> Input to SV2 (Chunking)"""
+    file_name: str = Field(description="Name of the uploaded file")
+    file_type: str = Field(description="File extension: 'pdf', 'docx', or 'txt'")
+    sha256: str = Field(description="SHA-256 checksum to detect duplicates")
+    pages: list[ParsedPage] = Field(description="List of extracted pages/sections")
+    total_characters: int = Field(ge=1, description="Total non-whitespace characters extracted")
+
+
+class DocumentChunk(BaseModel):
+    """Output of SV2 (Chunking & Indexing) -> Input to Vector Store & SV3 (Retrieval)"""
+    chunk_id: str = Field(description="Unique identifier for this chunk")
+    doc_id: str = Field(description="Parent document identifier")
+    course_id: str = Field(description="Course identifier for partition isolation")
+    file_name: str = Field(description="Source file name")
+    page: Optional[int] = Field(default=None, description="Page number if applicable")
+    content: str = Field(min_length=10, description="Chunk text content")
+    chunk_index: int = Field(ge=0, description="Ordinal index of the chunk in the document")
+
+
+class RetrievalResult(BaseModel):
+    """Output of SV3 (Course-Scoped Retrieval) -> Input to M3 (Question Generation)"""
+    course_id: str = Field(description="Course scope of the retrieval")
+    query: str = Field(description="Search prompt or query")
+    matches: list[SourceReference] = Field(description="Relevant chunks formatted as SourceReferences")

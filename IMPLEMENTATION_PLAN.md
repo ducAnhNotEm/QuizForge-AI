@@ -86,18 +86,33 @@ Schema trên là **hợp đồng mục tiêu**; cần ánh xạ sang cấu trúc
 
 **Điều kiện hoàn thành:** SV1, SV2, SV3 cùng duyệt hợp đồng; có ít nhất một test/fixture minh họa dữ liệu đầu vào và đầu ra.
 
-### M2 — Tài liệu và retrieval
-**Phụ trách:** SV1.
+### M2 — Tài liệu và retrieval (Phối hợp 3 thành viên: SV1 + SV2 + SV3)
+**Điều phối:** SV1 (Input & Parser) + SV2 (Chunking & Indexing) + SV3 (Retrieval & Citation).
 
-- [ ] M2.1 — Lần theo pipeline hiện có trong `backend/documents.py` và `backend/ingestion.py`.
-- [ ] M2.2 — Xác nhận upload PDF/DOCX/TXT hoạt động; không viết lại nếu tính năng đã ổn.
-- [ ] M2.3 — Kiểm tra xử lý file rỗng, lỗi đọc file, file trùng và tài liệu nhiều trang.
-- [ ] M2.4 — Xác nhận retrieval bị giới hạn trong môn/course được chọn, không lấy nhầm tài liệu từ course khác.
-- [ ] M2.5 — Kiểm tra nguồn/page citation nếu đã được hỗ trợ; không bịa số trang khi thiếu metadata.
-- [ ] M2.6 — Viết hoặc cập nhật unit tests cho các trường hợp thành công và lỗi.
-- [ ] M2.7 — Bàn giao mô tả đầu vào/đầu ra của retrieval cho SV2.
+- **SV1 (Input & File Parsing)**:
+  - [ ] M2.1 — Viết bộ bóc tách văn bản đa định dạng (.pdf, .docx, .txt) trong `backend/documents.py`.
+  - [ ] M2.2 — Bắt lỗi file rỗng, lỗi định dạng, và chặn file trùng lặp qua checksum SHA-256.
+  - [ ] M2.3 — Viết unit test `tests/test_documents.py` kiểm thử các ca đọc file thành công và thất bại.
 
-**Điều kiện hoàn thành:** với fixture đã chốt, truy xuất trả về các đoạn có liên quan và thông tin nguồn hiện có; các trường hợp lỗi được xử lý rõ ràng.
+- **SV2 (Chunking & Vector Storage)**:
+  - [ ] M2.4 — Xây dựng bộ chia đoạn văn bản (Text Chunker) có window overlap trong `backend/ingestion.py`.
+  - [ ] M2.5 — Lưu trữ chunk vào Vector DB / CSDL kèm metadata phân vùng môn học (`course_id`, `page`, `doc_id`).
+  - [ ] M2.6 — Viết unit test `tests/test_ingestion.py` kiểm thử độ dài chunk và tính toàn vẹn metadata.
+
+- **SV3 (Course-Scoped Retrieval & Citation)**:
+  - [ ] M2.7 — Xây dựng hàm tìm kiếm ngữ nghĩa theo môn học trong `backend/retrieval.py` đảm bảo cách ly tuyệt đối (`course_id`).
+  - [ ] M2.8 — Đóng gói danh sách trích dẫn nguồn (`source_refs`) chuẩn theo Hợp đồng API (kèm `page`, `snippet`).
+  - [ ] M2.9 — Viết unit test `tests/test_retrieval.py` kiểm thử độ chính xác truy xuất và bàn giao cho M3.
+
+**Tài liệu mẫu fixture có sẵn để kiểm thử (`tests/fixtures/`):**
+- `sample_lecture.pdf`: File PDF 2 trang thực tế để test trích xuất số trang.
+- `sample_lecture.docx`: File Word có tiêu đề và đoạn văn để test đọc DOCX.
+- `sample_course_doc.txt`: File văn bản bài học để test đọc TXT.
+- `empty_file.txt`: File 0 bytes để test bắt lỗi file rỗng.
+- `invalid_file.xyz`: File sai định dạng để test bắt lỗi file không hỗ trợ.
+- `sample_m2_handoff.json`: Dữ liệu mẫu bàn giao giữa SV1 $\rightarrow$ SV2 $\rightarrow$ SV3.
+
+**Điều kiện hoàn thành:** Cả 3 module vượt qua 100% unit tests của từng thành viên với các fixture mẫu đã có.
 
 ### M3 — Sinh câu hỏi và kiểm soát đầu ra
 **Phụ trách:** SV2.

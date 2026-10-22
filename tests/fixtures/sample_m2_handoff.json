@@ -1,0 +1,50 @@
+{
+  "sv1_output_sample": {
+    "file_name": "sample_lecture.pdf",
+    "file_type": "pdf",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "total_characters": 350,
+    "pages": [
+      {
+        "page": 1,
+        "text": "Chuong 1: Thuat toan tim kiem nhi phan (Binary Search). Do phuc tap thoi gian trong truong hop xau nhat la O(log n)."
+      },
+      {
+        "page": 2,
+        "text": "Chuong 2: Ngan xep (Stack) va Hang doi (Queue). Ngan xep hoat dong theo co che LIFO (Vao sau ra truoc)."
+      }
+    ]
+  },
+  "sv2_output_sample": [
+    {
+      "chunk_id": "chk_doc01_0",
+      "doc_id": "doc_01",
+      "course_id": "course_cntt",
+      "file_name": "sample_lecture.pdf",
+      "page": 1,
+      "chunk_index": 0,
+      "content": "Chuong 1: Thuat toan tim kiem nhi phan (Binary Search). Do phuc tap thoi gian trong truong hop xau nhat la O(log n)."
+    },
+    {
+      "chunk_id": "chk_doc01_1",
+      "doc_id": "doc_01",
+      "course_id": "course_cntt",
+      "file_name": "sample_lecture.pdf",
+      "page": 2,
+      "chunk_index": 1,
+      "content": "Chuong 2: Ngan xep (Stack) va Hang doi (Queue). Ngan xep hoat dong theo co che LIFO (Vao sau ra truoc)."
+    }
+  ],
+  "sv3_output_sample": {
+    "course_id": "course_cntt",
+    "query": "Độ phức tạp tìm kiếm nhị phân",
+    "matches": [
+      {
+        "doc_id": "doc_01",
+        "file_name": "sample_lecture.pdf",
+        "page": 1,
+        "snippet": "Chuong 1: Thuat toan tim kiem nhi phan (Binary Search). Do phuc tap thoi gian trong truong hop xau nhat la O(log n)."
+      }
+    ]
+  }
+}
