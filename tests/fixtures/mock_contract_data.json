@@ -1,6 +1,8 @@
 {
   "questgen_sample": {
     "stem": "Thuật toán tìm kiếm nhị phân yêu cầu cấu trúc dữ liệu mảng phải thoả mãn điều kiện tiên quyết nào?",
+    "difficulty": "medium",
+    "bloom_level": "understand",
     "options": [
       "Mảng đã được sắp xếp thứ tự",
       "Mảng có kích thước là lũy thừa của 2",
@@ -23,6 +25,8 @@
     "id": "q_test_001",
     "course_id": "course_cntt",
     "type": "mcq",
+    "difficulty": "medium",
+    "bloom_level": "understand",
     "question": "Thuật toán tìm kiếm nhị phân yêu cầu cấu trúc dữ liệu mảng phải thoả mãn điều kiện tiên quyết nào?",
     "options": [
       {"id": "A", "text": "Mảng đã được sắp xếp thứ tự"},

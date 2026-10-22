@@ -1,11 +1,12 @@
 """
 Contract and Schema Tests for QuizForge-AI.
-Milestone: M1 (API Contract & Schema Mapping)
+Milestone: M1 (API Contract & Schema Mapping - with Bloom's Taxonomy)
 
 Verifies:
 1. Target MCQ Schema validation rules (exactly 4 options, valid correct option ID, non-empty fields).
-2. Bi-directional Adapter from QuestGen GeneratedQuestion format to QuizForge Target Schema.
-3. Edge case error handling (invalid options count, correct answer mismatch, empty stem).
+2. Bloom's Taxonomy and difficulty level integration.
+3. Bi-directional Adapter from QuestGen GeneratedQuestion format to QuizForge Target Schema.
+4. Edge case error handling (invalid options count, correct answer mismatch, empty stem).
 """
 
 import json
@@ -18,6 +19,8 @@ from backend.schemas import (
     OptionItem,
     SourceReference,
     QuestionStatus,
+    BloomLevel,
+    DifficultyLevel,
     questgen_to_target_schema
 )
 
@@ -30,11 +33,13 @@ def mock_contract_data():
 
 
 def test_target_schema_valid_creation():
-    """Verify that a compliant MCQ passes validation cleanly."""
+    """Verify that a compliant MCQ with Bloom level and difficulty passes validation cleanly."""
     mcq = TargetMCQuestion(
         id="q_100",
         course_id="course_cs101",
         type="mcq",
+        difficulty=DifficultyLevel.EASY,
+        bloom_level=BloomLevel.REMEMBER,
         question="Độ phức tạp thuật toán tìm kiếm nhị phân là gì?",
         options=[
             OptionItem(id="A", text="O(1)"),
@@ -57,6 +62,8 @@ def test_target_schema_valid_creation():
     assert mcq.id == "q_100"
     assert mcq.correct_option_id == "B"
     assert len(mcq.options) == 4
+    assert mcq.bloom_level == BloomLevel.REMEMBER
+    assert mcq.difficulty == DifficultyLevel.EASY
     assert mcq.status == QuestionStatus.DRAFT
 
 
@@ -115,9 +122,9 @@ def test_target_schema_rejects_duplicate_options():
     assert "All 4 option texts must be unique" in str(exc_info.value)
 
 
-def test_questgen_adapter_successful_mapping(mock_contract_data):
+def test_questgen_adapter_successful_mapping_with_bloom(mock_contract_data):
     """
-    Test adapter converting QuestGen GeneratedQuestion format
+    Test adapter converting QuestGen GeneratedQuestion format with Bloom level
     into TargetMCQuestion compliant schema.
     """
     raw_questgen = mock_contract_data["questgen_sample"]
@@ -134,8 +141,10 @@ def test_questgen_adapter_successful_mapping(mock_contract_data):
     assert target_mcq.id == "q_test_001"
     assert target_mcq.course_id == "course_cntt"
     assert target_mcq.question == raw_questgen["stem"]
+    assert target_mcq.bloom_level == BloomLevel.UNDERSTAND
+    assert target_mcq.difficulty == DifficultyLevel.MEDIUM
     assert len(target_mcq.options) == 4
-    # In raw_questgen, the correct_answer is "Mảng đã được sắp xếp thứ tự", which is the first option (A)
+    # First option (A) is the correct answer
     assert target_mcq.correct_option_id == "A"
     assert target_mcq.status == QuestionStatus.DRAFT
     assert len(target_mcq.source_refs) == 1
@@ -143,7 +152,22 @@ def test_questgen_adapter_successful_mapping(mock_contract_data):
     assert target_mcq.source_refs[0].page == 25
 
 
-def test_questgen_adapter_error_when_correct_answer_not_in_options(mock_contract_data):
+def test_bloom_taxonomy_mapping_levels():
+    """Verify that all QuestGen Bloom levels map correctly to Target schema."""
+    levels = ["remember", "understand", "apply", "analyze", "evaluate", "create"]
+    for lvl in levels:
+        data = {
+            "stem": f"Question for level {lvl}",
+            "options": ["A", "B", "C", "D"],
+            "correct_answer": "A",
+            "explanation": "Valid explanation",
+            "bloom_level": lvl
+        }
+        res = questgen_to_target_schema(data, "q_bloom", "c_1")
+        assert res.bloom_level.value == lvl
+
+
+def test_questgen_adapter_error_when_correct_answer_not_in_options():
     """Adapter must raise an exception when QuestGen's correct_answer doesn't match any option."""
     bad_data = {
         "stem": "Câu hỏi test lỗi",

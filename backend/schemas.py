@@ -1,9 +1,10 @@
 """
 Pydantic Schemas and Contract Adapters for QuizForge-AI.
-Milestone: M1 (API Contract & Schema Mapping)
+Milestone: M1 (API Contract & Schema Mapping - Enhanced with Bloom's Taxonomy)
 
 This module defines:
-1. Target Question Schema: Standard MCQ schema used by QuizForge-AI.
+1. Target Question Schema: Standard MCQ schema used by QuizForge-AI,
+   incorporating Bloom's Cognitive Taxonomy and Difficulty Levels.
 2. Adapter functions: Bi-directional transformation between QuestGen-AI-Agent format
    and QuizForge-AI target format.
 """
@@ -17,6 +18,21 @@ class QuestionStatus(str, Enum):
     DRAFT = "draft"
     ACCEPTED = "accepted"
     REJECTED = "rejected"
+
+
+class BloomLevel(str, Enum):
+    REMEMBER = "remember"       # Nhận biết / Ghi nhớ
+    UNDERSTAND = "understand"   # Thông hiểu
+    APPLY = "apply"             # Vận dụng
+    ANALYZE = "analyze"         # Phân tích
+    EVALUATE = "evaluate"       # Đánh giá
+    CREATE = "create"           # Sáng tạo
+
+
+class DifficultyLevel(str, Enum):
+    EASY = "easy"
+    MEDIUM = "medium"
+    HARD = "hard"
 
 
 class OptionItem(BaseModel):
@@ -35,6 +51,14 @@ class TargetMCQuestion(BaseModel):
     id: str = Field(description="Unique question identifier")
     course_id: str = Field(description="Target course ID")
     type: str = Field(default="mcq", description="Question type, defaults to 'mcq'")
+    difficulty: DifficultyLevel = Field(
+        default=DifficultyLevel.MEDIUM,
+        description="Difficulty level of the question ('easy', 'medium', 'hard')"
+    )
+    bloom_level: BloomLevel = Field(
+        default=BloomLevel.UNDERSTAND,
+        description="Bloom's cognitive taxonomy level: remember, understand, apply, analyze, evaluate, create"
+    )
     question: str = Field(min_length=5, description="The main question prompt (stem)")
     options: list[OptionItem] = Field(
         min_length=4,
@@ -84,25 +108,46 @@ def questgen_to_target_schema(
     question_id: str,
     course_id: str,
     source_lookup: Optional[dict[str, dict]] = None,
-    status: str = "draft"
+    status: str = "draft",
+    bloom_level: Optional[str] = None,
+    difficulty: Optional[str] = None
 ) -> TargetMCQuestion:
     """
-    Transforms QuestGen's GeneratedQuestion format into QuizForge's TargetMCQuestion.
-
-    QuestGen format:
-    {
-        "stem": "...",
-        "options": ["text1", "text2", "text3", "text4"],
-        "correct_answer": "text1",
-        "explanation": "...",
-        "source_ids": ["src_1"]
-    }
+    Transforms QuestGen's GeneratedQuestion format into QuizForge's TargetMCQuestion,
+    mapping Bloom taxonomy levels and difficulty.
     """
     stem = questgen_data.get("stem") or questgen_data.get("question") or ""
     raw_options = questgen_data.get("options") or []
     correct_answer = questgen_data.get("correct_answer") or ""
     explanation = questgen_data.get("explanation") or ""
     source_ids = questgen_data.get("source_ids") or []
+
+    # Map Bloom level from input data or parameters
+    raw_bloom = (
+        bloom_level
+        or questgen_data.get("bloom_level")
+        or questgen_data.get("bloom")
+        or "understand"
+    ).lower()
+    try:
+        mapped_bloom = BloomLevel(raw_bloom)
+    except ValueError:
+        mapped_bloom = BloomLevel.UNDERSTAND
+
+    # Map Difficulty level
+    raw_diff = (
+        difficulty
+        or questgen_data.get("difficulty")
+        or "medium"
+    ).lower()
+    diff_map = {
+        "easy": DifficultyLevel.EASY,
+        "medium": DifficultyLevel.MEDIUM,
+        "moderate": DifficultyLevel.MEDIUM,
+        "hard": DifficultyLevel.HARD,
+        "complex": DifficultyLevel.HARD
+    }
+    mapped_diff = diff_map.get(raw_diff, DifficultyLevel.MEDIUM)
 
     if len(raw_options) != 4:
         raise ValueError(f"QuestGen data must have exactly 4 options, got {len(raw_options)}")
@@ -154,6 +199,8 @@ def questgen_to_target_schema(
         id=question_id,
         course_id=course_id,
         type="mcq",
+        difficulty=mapped_diff,
+        bloom_level=mapped_bloom,
         question=stem,
         options=formatted_options,
         correct_option_id=correct_option_id,

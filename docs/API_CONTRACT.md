@@ -1,8 +1,8 @@
 # API CONTRACT & DATA SPECIFICATION
 # Dự án: QuizForge-AI (AI Tutor)
 
-> **Mục tiêu:** Bản hợp đồng giao tiếp giữa các module (M1), được **đối chiếu trực tiếp với mã nguồn gốc của [QuestGen-AI-Agent](https://github.com/cRED-f/QuestGen-AI-Agent)** (`backend/app.py`, `backend/generation.py`, `backend/customization.py`).  
-> **Trạng thái:** Chốt duyệt bởi SV1, SV2, SV3.
+> **Mục tiêu:** Bản hợp đồng giao tiếp giữa các module (M1), được **đối chiếu trực tiếp với mã nguồn gốc của [QuestGen-AI-Agent](https://github.com/cRED-f/QuestGen-AI-Agent)** (`backend/app.py`, `backend/generation.py`, `backend/customization.py`, `backend/exam_context.py`).  
+> **Trạng thái:** Chốt duyệt bởi SV1, SV2, SV3 (Đã bổ sung thang nhận thức Bloom và mức độ khó).
 
 ---
 
@@ -18,14 +18,14 @@
       │     POST /api/courses/{course_id}/documents
       │     └── SV1 (RAG): Bóc tách text -> Chunking -> Vector Index
       │
-      ├─ 3. Yêu cầu sinh câu hỏi trắc nghiệm
+      ├─ 3. Yêu cầu sinh câu hỏi trắc nghiệm (Kèm ma trận Bloom & độ khó)
       │     POST /api/courses/{course_id}/questions/generate  (MVP Target Endpoint)
       │     (Hoặc luồng QuestGen gốc: POST /api/threads -> POST .../generations)
       │     └── SV1: Tìm context liên quan
-      │     └── SV2: Prompt LLM -> Nhận output -> Validate Schema
+      │     └── SV2: Prompt LLM theo cấp độ Bloom -> Nhận output -> Validate Schema
       │
-      ├─ 4. Hiển thị danh sách câu hỏi DRAFT kèm nguồn trích dẫn
-      │     UI hiển thị 4 lựa chọn, đáp án, giải thích, tên file & trang trích dẫn
+      ├─ 4. Hiển thị danh sách câu hỏi DRAFT kèm nguồn trích dẫn & mức độ Bloom
+      │     UI hiển thị 4 lựa chọn, đáp án, giải thích, nhãn Bloom, tên file & trang trích dẫn
       │
       └─ 5. Người dùng xem xét và Review
             PATCH /api/questions/{question_id}/review
@@ -43,29 +43,39 @@
 | **Tạo Môn học** | `POST /api/courses` (L370) | `POST /api/courses` | Body: `{"name": str, "description": str}` |
 | **Tải lên Tài liệu** | `POST /api/courses/{course_id}/documents` (L563) | `POST /api/courses/{course_id}/documents` | Multipart form `file`. Giữ nguyên logic trích xuất PDF/DOCX/TXT của SV1 |
 | **Tìm kiếm Đoạn trích** | `GET /api/courses/{course_id}/search?q=...` (L693) | `GET /api/courses/{course_id}/search` | Phục vụ kiểm thử RAG của SV1 |
-| **Sinh Câu hỏi** | `POST /api/threads/{thread_id}/generations` (L1988)<br>*(Kèm cơ chế Blueprint & Job queue)* | **Cách 1 (MVP Wrapper):**<br>`POST /api/courses/{course_id}/questions/generate`<br><br>**Cách 2 (Gốc):**<br>Qua Thread API | SV2 cung cấp hàm adapter bọc luồng sinh câu hỏi trả về ngay danh sách câu hỏi chuẩn hóa |
+| **Sinh Câu hỏi** | `POST /api/threads/{thread_id}/generations` (L1988)<br>*(Kèm Blueprint Bloom & Job queue)* | **Cách 1 (MVP Wrapper):**<br>`POST /api/courses/{course_id}/questions/generate`<br><br>**Cách 2 (Gốc):**<br>Qua Thread API | SV2 cung cấp hàm adapter bọc luồng sinh câu hỏi trả về ngay danh sách câu hỏi chuẩn hóa |
 | **Duyệt Câu hỏi (Review)** | `PUT /api/threads/{thread_id}/generations/{job_id}/questions/{question_id}/review` (L2125) | `PATCH /api/questions/{question_id}/review` | Body chuẩn: `{"status": "accepted" \| "rejected"}` |
 
 ---
 
-## 3. Ánh Xạ Schema Câu Hỏi Trắc Nghiệm (Schema Mapping - M1.2)
+## 3. Thang Nhận Thức Bloom & Độ Khó (Bloom's Taxonomy Integration)
 
-### 3.1. Cấu trúc câu hỏi gốc của QuestGen (`backend/generation.py` - L54)
+Kế thừa trực tiếp định nghĩa Bloom từ QuestGen (`backend/exam_context.py` và `backend/generation.py`):
 ```python
-class GeneratedQuestion(BaseModel):
-    stem: str                       # Nội dung câu hỏi
-    options: list[str]              # Mảng tối đa 4 chuỗi text phương án
-    correct_answer: str             # Chuỗi text trùng khớp 1 trong các options
-    explanation: str                # Giải thích
-    source_ids: list[str]           # ID các đoạn tài liệu nguồn (chunk ids)
+BLOOM = ('remember', 'understand', 'apply', 'analyze', 'evaluate', 'create')
 ```
 
-### 3.2. Cấu trúc câu hỏi mục tiêu (Target Schema MVP)
+| Cấp độ Bloom (`bloom_level`) | Thuật ngữ sư phạm | Đặc trưng câu hỏi | Độ khó khuyến nghị (`difficulty`) |
+|---|---|---|---|
+| `remember` | **Nhận biết / Ghi nhớ** | Nhắc lại định nghĩa, công thức, ngày tháng, tên khái niệm | `easy` |
+| `understand` | **Thông hiểu** | Giải thích ý nghĩa, phân biệt khái niệm, tóm tắt ý chính | `easy` / `medium` |
+| `apply` | **Vận dụng** | Áp dụng công thức, thuật toán để giải bài toán cụ thể | `medium` |
+| `analyze` | **Phân tích** | So sánh độ phức tạp, phân tích cấu trúc, tìm lỗi sai | `medium` / `hard` |
+| `evaluate` | **Đánh giá** | Phán đoán giải pháp tối ưu nhất, đánh giá trade-off | `hard` |
+| `create` | **Sáng tạo** | Đề xuất giải pháp mới, thiết kế thuật toán kết hợp | `hard` |
+
+---
+
+## 4. Ánh Xạ Schema Câu Hỏi Trắc Nghiệm (Schema Mapping - M1.2)
+
+### 4.1. Cấu trúc câu hỏi mục tiêu (Target Schema MVP)
 ```json
 {
   "id": "q_abc12345",
   "course_id": "course_cntt_01",
   "type": "mcq",
+  "difficulty": "medium",
+  "bloom_level": "understand",
   "question": "Thuật toán tìm kiếm nhị phân có độ phức tạp thời gian trong trường hợp xấu nhất là gì?",
   "options": [
     {"id": "A", "text": "O(1)"},
@@ -87,11 +97,13 @@ class GeneratedQuestion(BaseModel):
 }
 ```
 
-### 3.3. Bảng quy tắc chuyển đổi (Adapter Rules):
+### 4.2. Bảng quy tắc chuyển đổi (Adapter Rules):
 | Trường Target (QuizForge) | Trường Gốc (QuestGen) | Quy tắc chuyển đổi (Adapter Logic) |
 |---|---|---|
 | `id` | `assessment_questions.id` | Giữ nguyên mã ID chuỗi |
 | `type` | `kind` | Mặc định `"mcq"` cho câu hỏi trắc nghiệm |
+| `difficulty` | `difficulty` | `"easy"`, `"medium"`, `"hard"` (ánh xạ từ `moderate` $\rightarrow$ `medium`, `complex` $\rightarrow$ `hard`) |
+| `bloom_level` | `bloom_level` | Trích xuất từ Blueprint/Plan: `remember`, `understand`, `apply`, `analyze`, `evaluate`, `create` |
 | `question` | `stem` | Ánh xạ trực tiếp từ `stem` |
 | `options` (`list[OptionItem]`) | `options` (`list[str]`) | Chuyển đổi: `[{"id": "A", "text": opt[0]}, {"id": "B", "text": opt[1]}, ...]` |
 | `correct_option_id` | `correct_answer` | Tìm index của `correct_answer` trong `options`: `chr(65 + index)` (`"A"`, `"B"`, `"C"`, `"D"`) |
@@ -101,9 +113,7 @@ class GeneratedQuestion(BaseModel):
 
 ---
 
-## 4. Đặc Tả Mã Lỗi và Xử Lý Ngoại Lệ (Error Handling - M1.3)
-
-Đối chiếu với các ngoại lệ thực tế được bắt trong `backend/app.py`:
+## 5. Đặc Tả Mã Lỗi và Xử Lý Ngoại Lệ (Error Handling - M1.3)
 
 | Mã lỗi (`error.code`) | HTTP Status trong QuestGen | Trường hợp xảy ra | Cách ứng xử của Frontend (SV3) |
 |---|---|---|---|
@@ -117,7 +127,7 @@ class GeneratedQuestion(BaseModel):
 
 ---
 
-## 5. Quy Chuẩn Đóng Gói Phản Hồi (Response Wrapper)
+## 6. Quy Chuẩn Đóng Gói Phản Hồi (Response Wrapper)
 
 ### Thành công:
 ```json
