@@ -8,6 +8,8 @@ Dự án tham khảo kiến trúc từ [QuestGen-AI-Agent](https://github.com/cR
 
 ## 📚 Tài liệu Dự án
 
+- 🤖 [Tài liệu bối cảnh & Handoff cho Claude / AI (CLAUDE_PROJECT_CONTEXT.md)](CLAUDE_PROJECT_CONTEXT.md)
+- 📑 [Báo cáo phân công nhiệm vụ nhóm 3 người (BAO_CAO_PHAN_CONG_NHIEM_VU.md)](BAO_CAO_PHAN_CONG_NHIEM_VU.md)
 - 📋 [Kế hoạch triển khai chi tiết (IMPLEMENTATION_PLAN.md)](IMPLEMENTATION_PLAN.md)
 - 🔌 [Hợp đồng API & JSON Schema (docs/API_CONTRACT.md)](docs/API_CONTRACT.md)
 - 🏛️ [Kiến trúc hệ thống tổng quan (docs/ARCHITECTURE.md)](docs/ARCHITECTURE.md)

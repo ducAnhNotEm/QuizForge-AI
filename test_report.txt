@@ -1,0 +1,44 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.0, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\AD\AppData\Local\Programs\Python\Python312\python.exe
+cachedir: .pytest_cache
+rootdir: D:\AI_sinh_cau_hoi
+plugins: anyio-4.15.1
+collecting ... collected 35 items
+
+tests/test_contract.py::test_target_schema_valid_creation PASSED         [  2%]
+tests/test_contract.py::test_target_schema_rejects_non_4_options PASSED  [  5%]
+tests/test_contract.py::test_target_schema_rejects_mismatched_correct_option PASSED [  8%]
+tests/test_contract.py::test_target_schema_rejects_duplicate_options PASSED [ 11%]
+tests/test_contract.py::test_questgen_adapter_successful_mapping_with_bloom PASSED [ 14%]
+tests/test_contract.py::test_bloom_taxonomy_mapping_levels PASSED        [ 17%]
+tests/test_contract.py::test_questgen_adapter_error_when_correct_answer_not_in_options PASSED [ 20%]
+tests/test_documents.py::test_parse_valid_pdf_multi_page PASSED          [ 22%]
+tests/test_documents.py::test_parse_valid_docx PASSED                    [ 25%]
+tests/test_documents.py::test_parse_valid_txt PASSED                     [ 28%]
+tests/test_documents.py::test_txt_decoding_utf16_with_bom PASSED         [ 31%]
+tests/test_documents.py::test_txt_decoding_cp1258_vietnamese PASSED      [ 34%]
+tests/test_documents.py::test_txt_invalid_binary_raises_corrupted PASSED [ 37%]
+tests/test_documents.py::test_txt_with_nul_bytes_rejected PASSED         [ 40%]
+tests/test_documents.py::test_docx_table_interleaved_between_paragraphs_and_merged_cells PASSED [ 42%]
+tests/test_documents.py::test_pdf_encrypted_raises_encrypted_file_error PASSED [ 45%]
+tests/test_documents.py::test_pdf_scanned_without_text_layer_raises_scanned_error PASSED [ 48%]
+tests/test_documents.py::test_pdf_magic_bytes_tolerant_with_leading_bytes PASSED [ 51%]
+tests/test_documents.py::test_order_of_checks_extension_before_empty PASSED [ 54%]
+tests/test_documents.py::test_nonexistent_file_raises_not_found PASSED   [ 57%]
+tests/test_documents.py::test_empty_file_with_valid_extension PASSED     [ 60%]
+tests/test_documents.py::test_file_size_limit_exceeded PASSED            [ 62%]
+tests/test_documents.py::test_docx_zip_bomb_rejected PASSED              [ 65%]
+tests/test_documents.py::test_magic_bytes_spoofing_detection PASSED      [ 68%]
+tests/test_documents.py::test_docx_magic_bytes_spoofing PASSED           [ 71%]
+tests/test_documents.py::test_docx_ole_header_raises_encrypted PASSED    [ 74%]
+tests/test_documents.py::test_zip_renamed_to_docx_raises_corrupted PASSED [ 77%]
+tests/test_documents.py::test_pdf_valid_header_garbage_body PASSED       [ 80%]
+tests/test_documents.py::test_vietnamese_unicode_nfc_normalization PASSED [ 82%]
+tests/test_documents.py::test_text_hyphenation_and_soft_hyphens PASSED   [ 85%]
+tests/test_documents.py::test_soft_hyphen_at_line_end_joins_word PASSED  [ 88%]
+tests/test_documents.py::test_hyphen_does_not_merge_paragraphs PASSED    [ 91%]
+tests/test_documents.py::test_sha256_deterministic_and_matches PASSED    [ 94%]
+tests/test_m2_contracts.py::test_fixture_files_exist_and_readable PASSED [ 97%]
+tests/test_m2_contracts.py::test_m2_handoff_contract_validation PASSED   [100%]
+
+============================= 35 passed in 0.69s ==============================
