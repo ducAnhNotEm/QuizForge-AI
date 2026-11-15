@@ -13,6 +13,7 @@ Dự án tham khảo kiến trúc từ [QuestGen-AI-Agent](https://github.com/cR
 - 📋 [Kế hoạch triển khai chi tiết (IMPLEMENTATION_PLAN.md)](IMPLEMENTATION_PLAN.md)
 - 🔌 [Hợp đồng API & JSON Schema (docs/API_CONTRACT.md)](docs/API_CONTRACT.md)
 - 🏛️ [Kiến trúc hệ thống tổng quan (docs/ARCHITECTURE.md)](docs/ARCHITECTURE.md)
+- 🧠 [Pipeline nhúng và lưu vector (docs/INGESTION.md)](docs/INGESTION.md)
 - 📝 [Biên bản chốt phạm vi MVP (docs/meeting-notes/decisions.md)](docs/meeting-notes/decisions.md)
 
 ---
