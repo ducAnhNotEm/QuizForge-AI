@@ -118,19 +118,29 @@ Schema trên là **hợp đồng mục tiêu ban đầu**; cần ánh xạ sang 
 
 **Điều kiện hoàn thành:** Cả 3 module vượt qua 100% unit tests của từng thành viên với các fixture mẫu đã có.
 
-### M3 — Sinh câu hỏi và kiểm soát đầu ra
-**Phụ trách:** SV2.
+### M3 — Sinh câu hỏi bằng AI & Đảm bảo Chất lượng (Phối hợp 3 thành viên: SV1 + SV2 + SV3)
+**Điều phối:** SV1 (Prompt & Context) + SV2 (LLM Integration & Resilience) + SV3 (Quality Gatekeeper & Deduplication).
 
-- [ ] M3.1 — Lần theo pipeline hiện có trong `backend/generation.py`, `backend/exam_builder.py`, `backend/exam_context.py`.
-- [ ] M3.2 — Tạo câu hỏi từ context được retrieval cung cấp, không cho model tự coi kiến thức ngoài tài liệu là bằng chứng.
-- [ ] M3.3 — Chuẩn hóa đầu ra theo schema đã thống nhất; xử lý JSON lỗi/thiếu trường/loại dữ liệu sai.
-- [ ] M3.4 — Kiểm tra đủ 4 lựa chọn, ID lựa chọn không trùng, đáp án đúng nằm trong lựa chọn.
-- [ ] M3.5 — Thêm kiểm tra câu hỏi trùng lặp ở mức cơ bản và phát hiện câu hỏi/đáp án rỗng.
-- [ ] M3.6 — Giữ trạng thái `draft` cho câu hỏi mới; người dùng phải xem lại trước khi coi là đã duyệt.
-- [ ] M3.7 — Thêm test cho đầu ra hợp lệ và các lỗi model thường gặp.
-- [ ] M3.8 — Ghi nhận giới hạn: kiểm tra schema không chứng minh nội dung học thuật đúng tuyệt đối.
+- **SV1 (Context Injection & Prompt Engineering)**:
+  - [ ] M3.1 — Tiếp nhận kết quả từ retrieval, làm sạch và đóng gói vào cấu trúc Context đưa vào LLM (`backend/exam_context.py`).
+  - [ ] M3.2 — Thiết kế kỹ thuật Prompt Engineering chuyên sâu (System prompt + User prompt) buộc mô hình bám sát tài liệu bài giảng (Grounding), chống bịa đặt kiến thức (Hallucination) (`backend/prompts.py`).
+  - [ ] M3.3 — Yêu cầu mô hình sinh giải thích chi tiết vì sao đáp án đúng và vì sao 3 phương án còn lại sai (kèm trích dẫn nguồn).
+  - [ ] M3.4 — Viết unit test `tests/test_prompt_context.py` kiểm thử khả năng đóng gói context và chất lượng prompt.
 
-**Điều kiện hoàn thành:** với context mẫu, pipeline trả về danh sách câu hỏi theo schema hoặc báo lỗi có kiểm soát; không làm ứng dụng sập khi model trả dữ liệu không hợp lệ.
+- **SV2 (LLM Integration & Resilience Pipeline)**:
+  - [ ] M3.5 — Tích hợp các LLM Provider: Google Gemini API (SDK Async), OpenAI GPT và Local LLM Ollama (`backend/generation.py`, `backend/llm_client.py`).
+  - [ ] M3.6 — Xây dựng cơ chế gọi API bất đồng bộ (Async), quản lý token limit và tối ưu tham số mô hình (`temperature`, `top_p`).
+  - [ ] M3.7 — Xử lý chống nghẽn và chịu lỗi: Cơ chế Retry với Exponential Backoff khi API mạng bị ngắt quãng hoặc gặp rate-limit.
+  - [ ] M3.8 — Viết unit test `tests/test_llm_resilience.py` kiểm thử cơ chế gọi API và tự động thử lại khi timeout.
+
+- **SV3 (Quality Gatekeeper & Deduplication)**:
+  - [ ] M3.9 — Xây dựng bộ lọc kiểm định chất lượng đầu ra: Validate nghiêm ngặt JSON Schema bằng Pydantic v2 (chặn lỗi JSON méo, thiếu trường, sai kiểu dữ liệu).
+  - [ ] M3.10 — Kiểm tra logic đề thi: Đúng 4 phương án độc lập (A, B, C, D), không có lựa chọn trùng nhau, đáp án đúng phải thuộc danh sách lựa chọn (`backend/mcq_parsing.py`, `backend/schemas.py`).
+  - [ ] M3.11 — Lập trình thuật toán phát hiện và lọc câu hỏi trùng lặp (Question Deduplication).
+  - [ ] M3.12 — Quản lý trạng thái câu hỏi (`draft` → `accepted` / `rejected`), lưu trữ câu hỏi nháp an toàn.
+  - [ ] M3.13 — Viết unit test `tests/test_generation_quality.py` kiểm thử tính toàn vẹn câu hỏi và loại bỏ câu trùng lặp.
+
+**Điều kiện hoàn thành:** Với context mẫu từ M2, pipeline M3 gọi được LLM, tự động bắt lỗi/retry khi mạng chập chờn, trả về danh sách câu hỏi chuẩn schema Pydantic, lọc sạch câu hỏi trùng và vượt qua 100% unit tests của cả 3 thành viên.
 
 ### M3A — Học thích ứng: ước lượng mức nắm vững và chọn câu hỏi theo trình độ
 **Phụ trách:** Cả nhóm. SV1 (khái niệm + dữ liệu), SV2 (mastery + chọn câu + sinh câu có tham số), SV3 (hợp đồng API, tích hợp, mô phỏng, đánh giá).
