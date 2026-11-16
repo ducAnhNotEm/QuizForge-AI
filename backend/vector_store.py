@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 import os
 from pathlib import Path
-from typing import Sequence
+from typing import Any, Sequence
 
 from backend.schemas import DocumentChunk
 
@@ -175,6 +175,40 @@ class ChromaVectorStore:
         if stale_ids:
             self.collection.delete(ids=sorted(stale_ids))
         return len(chunks)
+
+    def query_chunks(
+        self,
+        *,
+        query_embedding: Sequence[float],
+        course_id: str,
+        top_k: int,
+        doc_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Query chunks within one course, optionally limited to one document.
+
+        The course filter is applied by ChromaDB itself rather than after a
+        global query, preventing cross-course results from reaching callers.
+        """
+        if not course_id.strip():
+            raise ValueError("course_id must not be empty.")
+        if top_k < 1:
+            raise ValueError("top_k must be at least 1.")
+        if not query_embedding:
+            raise ValueError("query_embedding must not be empty.")
+        if doc_id is not None and not doc_id.strip():
+            raise ValueError("doc_id must not be empty when provided.")
+
+        where = (
+            {"course_id": course_id}
+            if doc_id is None
+            else self._document_scope(course_id, doc_id)
+        )
+        return self.collection.query(
+            query_embeddings=[list(query_embedding)],
+            n_results=top_k,
+            where=where,
+            include=["documents", "metadatas", "distances"],
+        )
 
     def delete_document(self, *, course_id: str, doc_id: str) -> None:
         """Remove all indexed chunks for one document in one course."""
