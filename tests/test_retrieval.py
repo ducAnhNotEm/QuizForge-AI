@@ -255,3 +255,104 @@ def test_vector_store_query_delegates_course_filter_and_options() -> None:
     assert collection.arguments["where"] == {
         "$and": [{"course_id": "course-a"}, {"doc_id": "doc-1"}]
     }
+
+
+# ==============================================================================
+# Tests for retrieve_context (Context expansion & min_score filtering)
+# ==============================================================================
+
+from backend.retrieval import retrieve_context
+from backend.schemas import RetrievedChunk
+
+
+def _rc(i, score=None, doc="d1"):
+    return RetrievedChunk(
+        chunk_id=f"{doc}-{i}",
+        doc_id=doc,
+        course_id="c",
+        file_name="f.pdf",
+        page=None,
+        chunk_index=i,
+        content=f"nội dung đoạn {i}",
+        score=score,
+        distance=None if score is None else 1 - score,
+    )
+
+
+class ContextStore:
+    embedding_model = "m"
+
+    def __init__(self, hits):
+        self.hits = hits
+
+    def search(self, **kwargs):
+        return list(self.hits)
+
+    def get_neighbors(self, *, course_id, doc_id, chunk_index, window=1, include_self=False):
+        return [
+            _rc(i, doc=doc_id)
+            for i in range(chunk_index - window, chunk_index + window + 1)
+            if i >= 0 and i != chunk_index
+        ]
+
+
+def test_min_score_filters_weak_hits():
+    class DummyEmbedder:
+        model_name = "m"
+
+        def embed_query(self, text):
+            return [1.0, 0.0]
+
+    store = ContextStore([_rc(1, 0.9), _rc(5, 0.3)])
+    result = retrieve_context(
+        query="q",
+        course_id="c",
+        embedder=DummyEmbedder(),
+        vector_store=store,
+        min_score=0.5,
+    )
+    assert [c.chunk_index for c in result.chunks] == [1]
+    assert len(result.matches) == 1 and result.matches[0].chunk_id == "d1-1"
+
+
+def test_neighbors_are_deduped_and_follow_hits_in_reading_order():
+    class DummyEmbedder:
+        model_name = "m"
+
+        def embed_query(self, text):
+            return [1.0, 0.0]
+
+    store = ContextStore([_rc(5, 0.9), _rc(6, 0.8)])
+    result = retrieve_context(
+        query="q",
+        course_id="c",
+        embedder=DummyEmbedder(),
+        vector_store=store,
+        neighbor_window=1,
+    )
+    assert [c.chunk_index for c in result.chunks] == [5, 6, 4, 7]
+    assert [c.score for c in result.chunks][2:] == [None, None]
+
+
+def test_model_mismatch_and_empty_query():
+    class DummyEmbedder:
+        model_name = "m"
+
+        def embed_query(self, text):
+            return [1.0, 0.0]
+
+    with pytest.raises(ValueError):
+        retrieve_context(
+            query="q",
+            course_id="c",
+            embedder=DummyEmbedder(),
+            vector_store=type("S", (ContextStore,), {"embedding_model": "z"})([]),
+        )
+    with pytest.raises(ValueError):
+        retrieve_context(
+            query="  ",
+            course_id="c",
+            embedder=DummyEmbedder(),
+            vector_store=ContextStore([]),
+        )
+

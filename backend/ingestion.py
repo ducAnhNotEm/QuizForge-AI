@@ -8,10 +8,15 @@ already present in the hand-off schema.
 from __future__ import annotations
 
 import hashlib
+import json
+import logging
 import re
+import unicodedata
 from typing import Protocol, Sequence
 
 from backend.schemas import DocumentChunk, ParsedDocument
+
+logger = logging.getLogger(__name__)
 
 
 # Initial settings mirror the upstream QuestGen character-window defaults.
@@ -41,6 +46,30 @@ class ChunkVectorStore(Protocol):
         chunks: Sequence[DocumentChunk],
         embeddings: Sequence[Sequence[float]],
     ) -> int: ...
+
+    def delete_document(self, *, course_id: str, doc_id: str) -> None: ...
+
+
+def _normalize_page_text(text: str) -> str:
+    """Unify newlines and Unicode form before chunking.
+
+    PDF extractors often emit Vietnamese in NFD (base letter + combining mark).
+    Mixing NFD and NFC makes the same word embed and match differently, so
+    everything is normalized to NFC.
+    """
+    unified = text.replace("\r\n", "\n").replace("\r", "\n")
+    return unicodedata.normalize("NFC", unified).strip()
+
+
+def make_chunk_id(course_id: str, doc_id: str, chunk_index: int) -> str:
+    """Stable chunk id that is unique across courses.
+
+    ``course_id`` is part of the hash: the same ``doc_id`` (for example a file
+    SHA-256) uploaded to two courses must not overwrite each other's chunks.
+    JSON encoding avoids ambiguity when ids contain separators such as ":".
+    """
+    payload = json.dumps([course_id, doc_id, chunk_index], ensure_ascii=True)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:32]
 
 
 def _cut_at_boundary(
@@ -112,14 +141,15 @@ def _overlap_start(text: str, start: int, end: int, overlap: int) -> int:
 
 def _split_page(text: str, chunk_size: int, overlap: int) -> list[str]:
     """Split one page into bounded chunks while retaining an overlap."""
-    normalized = text.replace("\r\n", "\n").replace("\r", "\n").strip()
+    normalized = _normalize_page_text(text)
     if not normalized:
         return []
     if len(normalized) < MIN_CHUNK_CHARS:
-        raise ValueError(
-            "A non-empty parsed page must contain at least "
-            f"{MIN_CHUNK_CHARS} characters to form a DocumentChunk."
-        )
+        # Page numbers, "Chương 3", "Cảm ơn", a lone figure caption... Real
+        # PDFs/slides have many of these; one of them must not abort indexing
+        # of the whole document, and it carries nothing worth retrieving.
+        logger.debug("Skipping page with only %d characters.", len(normalized))
+        return []
 
     chunks: list[str] = []
     start = 0
@@ -186,9 +216,7 @@ def chunk_document(
         )
         for content in page_chunks:
             chunk_index = len(result)
-            chunk_id = hashlib.sha256(
-                f"{doc_id}:{chunk_index}".encode("utf-8")
-            ).hexdigest()[:32]
+            chunk_id = make_chunk_id(course_id, doc_id, chunk_index)
             result.append(
                 DocumentChunk(
                     chunk_id=chunk_id,
@@ -214,11 +242,15 @@ def index_document(
     chunk_size_chars: int = DEFAULT_CHUNK_SIZE_CHARS,
     overlap_chars: int = DEFAULT_CHUNK_OVERLAP_CHARS,
 ) -> list[DocumentChunk]:
-    """Chunk, embed, then persist one parsed document.
+    """Chunk, embed, then persist one parsed document (replacing older chunks).
 
     Provider and store dependencies are injectable for callers that need a
     different embedding service or a test double. Defaults use the configured
-    Ollama provider and local persistent ChromaDB collection.
+    Ollama provider and the shared persistent ChromaDB collection.
+
+    Re-indexing is a *replace*: if the new version of the document produces no
+    chunks (for example it became empty), the previously stored chunks are
+    removed instead of being left behind as stale search results.
     """
     chunks = chunk_document(
         document,
@@ -227,28 +259,32 @@ def index_document(
         chunk_size_chars=chunk_size_chars,
         overlap_chars=overlap_chars,
     )
-    if not chunks:
-        return []
 
+    # Resolving providers does no network I/O, so do it before the expensive
+    # embedding call and fail fast on a model mismatch.
     if embedder is None:
         from backend.embeddings import create_embedding_provider
 
         embedder = create_embedding_provider()
+
+    if vector_store is None:
+        from backend.vector_store import get_vector_store
+
+        vector_store = get_vector_store(embedder.model_name)
+    elif vector_store.embedding_model != embedder.model_name:
+        raise ValueError(
+            "The vector store and embedding provider must use the same model."
+        )
+
+    if not chunks:
+        vector_store.delete_document(course_id=course_id, doc_id=doc_id)
+        return []
 
     embeddings = embedder.embed_documents([chunk.content for chunk in chunks])
     if len(embeddings) != len(chunks):
         raise ValueError(
             f"Embedding provider returned {len(embeddings)} vectors for "
             f"{len(chunks)} chunks."
-        )
-
-    if vector_store is None:
-        from backend.vector_store import ChromaVectorStore
-
-        vector_store = ChromaVectorStore(embedding_model=embedder.model_name)
-    elif vector_store.embedding_model != embedder.model_name:
-        raise ValueError(
-            "The vector store and embedding provider must use the same model."
         )
 
     vector_store.upsert_chunks(chunks, embeddings)

@@ -1,6 +1,6 @@
 """Course-scoped semantic retrieval and citation packaging for M2.C.
 
-The retriever deliberately delegates course filtering to the vector store.  A
+The retriever deliberately delegates course filtering to the vector store. A
 query is never executed against the whole collection and filtered afterwards;
 this keeps course isolation enforced at the database boundary as well as in
 Python's defensive validation layer.
@@ -11,7 +11,7 @@ from __future__ import annotations
 import math
 from typing import Any, Protocol, Sequence
 
-from backend.schemas import RetrievalResult, SourceReference
+from backend.schemas import RetrievalResult, RetrievedChunk, SourceReference
 
 
 DEFAULT_TOP_K = 5
@@ -39,6 +39,25 @@ class RetrievalStore(Protocol):
         top_k: int,
         doc_id: str | None = None,
     ) -> dict[str, Any]: ...
+
+    def search(
+        self,
+        *,
+        query_embedding: Sequence[float],
+        course_id: str,
+        top_k: int,
+        doc_id: str | None = None,
+    ) -> list[RetrievedChunk]: ...
+
+    def get_neighbors(
+        self,
+        *,
+        course_id: str,
+        doc_id: str,
+        chunk_index: int,
+        window: int = 1,
+        include_self: bool = False,
+    ) -> list[RetrievedChunk]: ...
 
 
 class CourseRetriever:
@@ -176,6 +195,7 @@ class CourseRetriever:
                     file_name=file_name,
                     page=page,
                     snippet=document.strip(),
+                    chunk_id=metadata.get("chunk_id"),
                 )
             )
 
@@ -208,3 +228,62 @@ def retrieve_course_context(
         top_k=top_k,
         doc_id=doc_id,
     )
+
+
+def retrieve_context(
+    *,
+    query: str,
+    course_id: str,
+    embedder: QueryEmbedder,
+    vector_store: RetrievalStore,
+    top_k: int = 6,
+    doc_id: str | None = None,
+    min_score: float | None = None,
+    neighbor_window: int = 0,
+) -> RetrievalResult:
+    """Retrieve context chunks for ``query`` inside one course.
+
+    - ``min_score``: drop hits whose cosine similarity (1 - distance) is lower.
+    - ``neighbor_window``: also fetch that many chunks before/after each hit
+      (same document). Hits come first in ranking order; neighbours follow in
+      reading order with ``score=None``. Useful for higher Bloom levels that
+      need more surrounding context than one ~1.100-character chunk.
+    """
+    if not query.strip():
+        raise ValueError("query must not be empty.")
+    if neighbor_window < 0:
+        raise ValueError("neighbor_window must not be negative.")
+    if vector_store.embedding_model != embedder.model_name:
+        raise ValueError(
+            "The vector store and embedding provider must use the same model: "
+            f"{vector_store.embedding_model!r} != {embedder.model_name!r}."
+        )
+
+    query_embedding = embedder.embed_query(query)
+    hits = vector_store.search(
+        query_embedding=query_embedding,
+        course_id=course_id,
+        top_k=top_k,
+        doc_id=doc_id,
+    )
+    if min_score is not None:
+        hits = [hit for hit in hits if hit.score is not None and hit.score >= min_score]
+
+    chunks: list[RetrievedChunk] = list(hits)
+    if neighbor_window > 0:
+        seen = {chunk.chunk_id for chunk in chunks}
+        extras: list[RetrievedChunk] = []
+        for hit in hits:
+            for neighbor in vector_store.get_neighbors(
+                course_id=course_id,
+                doc_id=hit.doc_id,
+                chunk_index=hit.chunk_index,
+                window=neighbor_window,
+            ):
+                if neighbor.chunk_id not in seen:
+                    seen.add(neighbor.chunk_id)
+                    extras.append(neighbor)
+        extras.sort(key=lambda chunk: (chunk.doc_id, chunk.chunk_index))
+        chunks.extend(extras)
+
+    return RetrievalResult.from_chunks(course_id=course_id, query=query, chunks=chunks)

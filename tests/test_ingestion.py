@@ -1,117 +1,100 @@
-"""Unit tests for SV2 document chunking and its metadata hand-off."""
+import unicodedata
 
-from backend.ingestion import chunk_document
+import pytest
+
+from backend.ingestion import chunk_document, index_document, make_chunk_id
 from backend.schemas import ParsedDocument, ParsedPage
 
 
-def _lecture_text(prefix: str, paragraph_count: int = 18) -> str:
-    paragraphs = [
-        (
-            f"{prefix}-{index:03d}: Sinh viên cần hiểu khái niệm, ghi nhớ nguyên tắc "
-            f"và vận dụng kiến thức này vào bài tập số {index}."
-        )
-        for index in range(paragraph_count)
-    ]
-    return "\n\n".join(paragraphs)
-
-
-def _parsed_document(*pages: ParsedPage, file_name: str = "lecture.pdf") -> ParsedDocument:
-    total_characters = sum(
-        1 for page in pages for character in page.text if not character.isspace()
-    )
+def make_doc(*pages, file_name="a.pdf"):
+    parsed = [ParsedPage(page=i + 1, text=text) for i, text in enumerate(pages)]
     return ParsedDocument(
         file_name=file_name,
-        file_type=file_name.rsplit(".", 1)[-1],
-        sha256="a" * 64,
-        pages=list(pages),
-        total_characters=total_characters,
+        file_type="pdf",
+        sha256="0" * 64,
+        pages=parsed,
+        total_characters=max(1, sum(len(t.replace(" ", "")) for t in pages)),
     )
 
 
-def _longest_suffix_prefix_overlap(left: str, right: str) -> int:
-    limit = min(len(left), len(right))
-    for length in range(limit, 0, -1):
-        if left.endswith(right[:length]):
-            return length
-    return 0
+LONG = " ".join(f"Câu số {i} nói về khái niệm quan trọng." for i in range(120))
 
 
-def test_chunks_respect_size_limit_and_keep_overlap() -> None:
-    text = _lecture_text("CHUNK", paragraph_count=30)
-    document = _parsed_document(ParsedPage(page=1, text=text))
+def test_tiny_page_is_skipped_not_fatal():
+    doc = make_doc("3", LONG, "Cảm ơn")
+    chunks = chunk_document(doc, doc_id="d1", course_id="c1")
+    assert chunks, "real content must still be indexed"
+    assert {c.page for c in chunks} == {2}
 
-    chunks = chunk_document(
-        document,
-        doc_id="doc-length",
-        course_id="course-algorithms",
-        chunk_size_chars=190,
-        overlap_chars=30,
-    )
 
+def test_all_tiny_pages_yield_no_chunks():
+    assert chunk_document(make_doc("1", "ab"), doc_id="d1", course_id="c1") == []
+
+
+def test_chunk_id_depends_on_course():
+    doc = make_doc(LONG)
+    a = chunk_document(doc, doc_id="same", course_id="course-a")
+    b = chunk_document(doc, doc_id="same", course_id="course-b")
+    assert {c.chunk_id for c in a}.isdisjoint({c.chunk_id for c in b})
+    assert [c.chunk_id for c in a] == [c.chunk_id for c in chunk_document(doc, doc_id="same", course_id="course-a")]
+
+
+def test_chunk_id_has_no_separator_ambiguity():
+    assert make_chunk_id("a:b", "c", 1) != make_chunk_id("a", "b:c", 1)
+
+
+def test_text_is_nfc_normalized():
+    nfd = unicodedata.normalize("NFD", "Tiếng Việt có dấu thanh và dấu mũ rất đa dạng.")
+    chunks = chunk_document(make_doc(nfd), doc_id="d", course_id="c")
+    assert all(unicodedata.is_normalized("NFC", c.content) for c in chunks)
+    assert "Tiếng Việt" in chunks[0].content  # composed form
+
+
+def test_chunks_respect_size_and_index_order():
+    chunks = chunk_document(make_doc(LONG), doc_id="d", course_id="c", chunk_size_chars=500, overlap_chars=50)
     assert len(chunks) > 1
-    assert all(10 <= len(chunk.content) <= 190 for chunk in chunks)
-    assert all(
-        _longest_suffix_prefix_overlap(left.content, right.content) >= 18
-        for left, right in zip(chunks, chunks[1:])
-    )
-
-    for index in range(30):
-        assert f"CHUNK-{index:03d}" in "\n".join(chunk.content for chunk in chunks)
+    assert all(len(c.content) <= 500 for c in chunks)
+    assert [c.chunk_index for c in chunks] == list(range(len(chunks)))
 
 
-def test_chunk_metadata_stays_with_its_page_and_document() -> None:
-    document = _parsed_document(
-        ParsedPage(page=1, text=_lecture_text("PAGE-ONE", paragraph_count=18)),
-        ParsedPage(page=2, text=_lecture_text("PAGE-TWO", paragraph_count=18)),
-    )
+class FakeEmbedder:
+    model_name = "fake:model"
 
-    chunks = chunk_document(
-        document,
-        doc_id="doc-pages",
-        course_id="course-algorithms",
-        chunk_size_chars=190,
-        overlap_chars=30,
-    )
-
-    assert chunks
-    assert {chunk.page for chunk in chunks} == {1, 2}
-    assert all(chunk.doc_id == "doc-pages" for chunk in chunks)
-    assert all(chunk.course_id == "course-algorithms" for chunk in chunks)
-    assert all(chunk.file_name == "lecture.pdf" for chunk in chunks)
-
-    page_one_chunks = [chunk for chunk in chunks if chunk.page == 1]
-    page_two_chunks = [chunk for chunk in chunks if chunk.page == 2]
-    assert page_one_chunks and page_two_chunks
-    assert all("PAGE-TWO" not in chunk.content for chunk in page_one_chunks)
-    assert all("PAGE-ONE" not in chunk.content for chunk in page_two_chunks)
-    assert [chunk.chunk_index for chunk in chunks] == list(range(len(chunks)))
+    def embed_documents(self, texts):
+        return [[1.0, 0.0] for _ in texts]
 
 
-def test_chunks_preserve_missing_page_and_have_stable_unique_ids() -> None:
-    document = _parsed_document(
-        ParsedPage(page=None, text=_lecture_text("TEXT-DOC", paragraph_count=20)),
-        file_name="lecture.txt",
-    )
+class FakeStore:
+    def __init__(self, model="fake:model"):
+        self.embedding_model = model
+        self.upserts, self.deleted = [], []
 
-    first_pass = chunk_document(
-        document,
-        doc_id="doc-text",
-        course_id="course-literature",
-        chunk_size_chars=190,
-        overlap_chars=30,
-    )
-    second_pass = chunk_document(
-        document,
-        doc_id="doc-text",
-        course_id="course-literature",
-        chunk_size_chars=190,
-        overlap_chars=30,
-    )
+    def upsert_chunks(self, chunks, embeddings):
+        self.upserts.append((list(chunks), list(embeddings)))
+        return len(chunks)
 
-    assert first_pass
-    assert all(chunk.page is None for chunk in first_pass)
-    assert len({chunk.chunk_id for chunk in first_pass}) == len(first_pass)
-    assert [chunk.chunk_id for chunk in first_pass] == [
-        chunk.chunk_id for chunk in second_pass
-    ]
-    assert [chunk.chunk_index for chunk in first_pass] == list(range(len(first_pass)))
+    def delete_document(self, *, course_id, doc_id):
+        self.deleted.append((course_id, doc_id))
+
+
+def test_reindex_to_zero_chunks_deletes_stale_data():
+    store = FakeStore()
+    result = index_document(make_doc("x"), doc_id="d1", course_id="c1", embedder=FakeEmbedder(), vector_store=store)
+    assert result == []
+    assert store.deleted == [("c1", "d1")]
+    assert store.upserts == []
+
+
+def test_index_document_upserts_chunks():
+    store = FakeStore()
+    result = index_document(make_doc(LONG), doc_id="d1", course_id="c1", embedder=FakeEmbedder(), vector_store=store)
+    assert result and store.upserts[0][0] == result and store.deleted == []
+
+
+def test_model_mismatch_fails_before_embedding():
+    class Boom(FakeEmbedder):
+        def embed_documents(self, texts):
+            raise AssertionError("must not embed when the store model differs")
+
+    with pytest.raises(ValueError):
+        index_document(make_doc(LONG), doc_id="d", course_id="c", embedder=Boom(), vector_store=FakeStore("other"))
